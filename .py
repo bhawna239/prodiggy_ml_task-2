@@ -1,45 +1,62 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sn
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-# Sample Data
+import seaborn as sns
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+# 1. Load the dataset
+# Simulated sample data
 data = {
-    'SquareFeet': [1500, 1800, 2400, 3000, 3500],
-    'Bedrooms': [3, 4, 3, 5, 4],
-    'Bathrooms': [2, 2, 3, 4, 3],
-    'Price': [300000, 400000, 500000, 600000, 650000]
+    'CustomerID': range(1, 11),
+    'Annual Income (k$)': [15, 16, 17, 18, 19, 60, 62, 63, 64, 65],
+    'Spending Score (1-100)': [39, 81, 6, 77, 40, 50, 42, 55, 47, 49],
+    'Purchase Frequency': [5, 8, 3, 6, 7, 20, 19, 18, 21, 22]
 }
 
 df = pd.DataFrame(data)
-print(df.head())
-# Check for missing values
-print(df.isnull().sum())
 
-# Features and Target
-X = df[['SquareFeet', 'Bedrooms', 'Bathrooms']]
-y = df['Price']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-model = LinearRegression()
-model.fit(X_train, y_train)
-# Predictions
-y_pred = model.predict(X_test)
+# 2. Select features for clustering
+X = df[['Annual Income (k$)', 'Spending Score (1-100)', 'Purchase Frequency']]
 
-# Evaluation Metrics
-mse = mean_squared_error(y_test, y_pred)
-r2 = r2_score(y_test, y_pred)
+# 3. Feature scaling (important for K-means)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-print(f"Mean Squared Error: {mse}")
-print(f"R² Score: {r2}")
-plt.figure(figsize=(8,5))
-plt.scatter(y_test, y_pred)
-plt.xlabel("Actual Prices")
-plt.ylabel("Predicted Prices")
-plt.title("Actual vs Predicted House Prices")
-plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
+# 4. Determine the optimal number of clusters using the Elbow Method
+inertia = []
+K = range(1, 10)
+for k in K:
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X_scaled)
+    inertia.append(kmeans.inertia_)
+
+# Plot Elbow Curve
+plt.figure(figsize=(8, 4))
+plt.plot(K, inertia, 'bo-')
+plt.xlabel('Number of Clusters (k)')
+plt.ylabel('Inertia')
+plt.title('Elbow Method For Optimal k')
 plt.show()
-coeff_df = pd.DataFrame(model.coef_, X.columns, columns=['Coefficient'])
-print(coeff_df)
-print(f"Intercept: {model.intercept_}")
+
+# 5. Fit KMeans with optimal number of clusters (let's say k=3 for this example)
+kmeans = KMeans(n_clusters=3, random_state=42)
+df['Cluster'] = kmeans.fit_predict(X_scaled)
+
+# 6. Visualize clusters (using first 2 principal components for simplicity)
+from sklearn.decomposition import PCA
+
+pca = PCA(n_components=2)
+components = pca.fit_transform(X_scaled)
+df['PCA1'] = components[:, 0]
+df['PCA2'] = components[:, 1]
+
+plt.figure(figsize=(8, 6))
+sns.scatterplot(data=df, x='PCA1', y='PCA2', hue='Cluster', palette='viridis', s=100)
+plt.title('Customer Segments by K-means Clustering')
+plt.show()
+
+# 7. Optional: Examine cluster profiles
+cluster_summary = df.groupby('Cluster')[['Annual Income (k$)', 'Spending Score (1-100)', 'Purchase Frequency']].mean()
+print("Cluster Profiles:\n", cluster_summary)
+df = pd.read_csv('customer_purchase_data.csv')
